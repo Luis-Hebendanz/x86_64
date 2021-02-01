@@ -15,6 +15,7 @@ use crate::structures::gdt::SegmentSelector;
 /// is a valid code segment descriptor.
 #[inline]
 pub unsafe fn set_cs(sel: SegmentSelector) {
+    #[cfg(target_arch = "x86_64")]
     #[cfg(feature = "inline_asm")]
     #[inline(always)]
     unsafe fn inner(sel: SegmentSelector) {
@@ -24,8 +25,23 @@ pub unsafe fn set_cs(sel: SegmentSelector) {
             "push {tmp}",
             "retfq",
             "1:",
-            sel = in(reg) u64::from(sel.0),
+            sel = in(reg) usize::from(sel.0),
             tmp = lateout(reg) _,
+        );
+    }
+
+    #[cfg(target_arch = "x86")]
+    #[cfg(feature = "inline_asm")]
+    #[inline(always)]
+    unsafe fn inner(sel: SegmentSelector) {
+        asm!(
+        "push {sel}",
+        "lea {tmp}, label",
+        "push {tmp}",
+        "retf",
+        "label:",
+        sel = in(reg) usize::from(sel.0),
+        tmp = lateout(reg) _,
         );
     }
 
@@ -145,6 +161,7 @@ pub fn cs() -> SegmentSelector {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
 /// Writes the FS segment base address
 ///
 /// ## Safety
@@ -171,6 +188,7 @@ pub unsafe fn wrfsbase(val: u64) {
     inner(val)
 }
 
+#[cfg(target_arch = "x86_64")]
 /// Reads the FS segment base address
 ///
 /// ## Safety
@@ -195,6 +213,7 @@ pub unsafe fn rdfsbase() -> u64 {
     inner()
 }
 
+#[cfg(target_arch = "x86_64")]
 /// Writes the GS segment base address
 ///
 /// ## Safety
@@ -220,6 +239,7 @@ pub unsafe fn wrgsbase(val: u64) {
     inner(val)
 }
 
+#[cfg(target_arch = "x86_64")]
 /// Reads the GS segment base address
 ///
 /// ## Safety
