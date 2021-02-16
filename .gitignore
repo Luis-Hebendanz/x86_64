@@ -11,3 +11,7 @@
 /target/
 Cargo.lock
 /testing/target
+.envrc
+.direnv
+.history
+.__pycache__
