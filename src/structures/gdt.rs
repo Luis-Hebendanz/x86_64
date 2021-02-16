@@ -224,7 +224,7 @@ impl GlobalDescriptorTable {
     fn pointer(&self) -> DescriptorTablePointer {
         use core::mem::size_of;
         DescriptorTablePointer {
-            base: VirtAddr::new(self.table.as_ptr() as u64),
+            base: VirtAddr::new(self.table.as_ptr() as u32),
             limit: (self.next_free * size_of::<u64>() - 1) as u16,
         }
     }

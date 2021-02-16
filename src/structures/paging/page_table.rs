@@ -15,14 +15,14 @@ pub enum FrameError {
     FrameNotPresent,
     /// The entry does have the `HUGE_PAGE` flag set. The `frame` method has a standard 4KiB frame
     /// as return type, so a huge frame can't be returned.
-    HugeFrame,
+    HugeFrame, //TODO
 }
 
 /// A 64-bit page table entry.
 #[derive(Clone)]
 #[repr(transparent)]
 pub struct PageTableEntry {
-    entry: u64,
+    entry: u32,
 }
 
 impl PageTableEntry {
@@ -53,7 +53,7 @@ impl PageTableEntry {
     /// Returns the physical address mapped by this entry, might be zero.
     #[inline]
     pub fn addr(&self) -> PhysAddr {
-        PhysAddr::new(self.entry & 0x000f_ffff_ffff_f000)
+        PhysAddr::new(self.entry & 0xffff_f000)
     }
 
     /// Returns the physical frame mapped by this entry.
@@ -78,7 +78,7 @@ impl PageTableEntry {
     #[inline]
     pub fn set_addr(&mut self, addr: PhysAddr, flags: PageTableFlags) {
         assert!(addr.is_aligned(Size4KiB::SIZE));
-        self.entry = (addr.as_u64()) | flags.bits();
+        self.entry = (addr.as_u32()) | flags.bits();
     }
 
     /// Map the entry to the specified physical frame with the specified flags.
@@ -91,7 +91,7 @@ impl PageTableEntry {
     /// Sets the flags of this entry.
     #[inline]
     pub fn set_flags(&mut self, flags: PageTableFlags) {
-        self.entry = self.addr().as_u64() | flags.bits();
+        self.entry = self.addr().as_u32() | flags.bits();
     }
 }
 
@@ -106,7 +106,7 @@ impl fmt::Debug for PageTableEntry {
 
 bitflags! {
     /// Possible flags for a page table entry.
-    pub struct PageTableFlags: u64 {
+    pub struct PageTableFlags: u32 {
         /// Specifies whether the mapped frame or page table is loaded in memory.
         const PRESENT =         1;
         /// Controls whether writes to the mapped frames are allowed.
@@ -132,44 +132,14 @@ bitflags! {
         /// Indicates that the mapping is present in all address spaces, so it isn't flushed from
         /// the TLB on an address space switch.
         const GLOBAL =          1 << 8;
-        /// Available to the OS, can be used to store additional data, e.g. custom flags.
-        const BIT_9 =           1 << 9;
-        /// Available to the OS, can be used to store additional data, e.g. custom flags.
-        const BIT_10 =          1 << 10;
-        /// Available to the OS, can be used to store additional data, e.g. custom flags.
-        const BIT_11 =          1 << 11;
-        /// Available to the OS, can be used to store additional data, e.g. custom flags.
-        const BIT_52 =          1 << 52;
-        /// Available to the OS, can be used to store additional data, e.g. custom flags.
-        const BIT_53 =          1 << 53;
-        /// Available to the OS, can be used to store additional data, e.g. custom flags.
-        const BIT_54 =          1 << 54;
-        /// Available to the OS, can be used to store additional data, e.g. custom flags.
-        const BIT_55 =          1 << 55;
-        /// Available to the OS, can be used to store additional data, e.g. custom flags.
-        const BIT_56 =          1 << 56;
-        /// Available to the OS, can be used to store additional data, e.g. custom flags.
-        const BIT_57 =          1 << 57;
-        /// Available to the OS, can be used to store additional data, e.g. custom flags.
-        const BIT_58 =          1 << 58;
-        /// Available to the OS, can be used to store additional data, e.g. custom flags.
-        const BIT_59 =          1 << 59;
-        /// Available to the OS, can be used to store additional data, e.g. custom flags.
-        const BIT_60 =          1 << 60;
-        /// Available to the OS, can be used to store additional data, e.g. custom flags.
-        const BIT_61 =          1 << 61;
-        /// Available to the OS, can be used to store additional data, e.g. custom flags.
-        const BIT_62 =          1 << 62;
-        /// Forbid code execution from the mapped frames.
-        ///
-        /// Can be only used when the no-execute page protection feature is enabled in the EFER
-        /// register.
-        const NO_EXECUTE =      1 << 63;
+
+        /// Enables Memory Typing for that page
+        const PAT = 1 << 12;
     }
 }
 
 /// The number of entries in a page table.
-const ENTRY_COUNT: usize = 512;
+const ENTRY_COUNT: usize = 1024;
 
 /// Represents a page table.
 ///
@@ -271,21 +241,21 @@ impl fmt::Debug for PageTable {
 
 /// A 9-bit index into a page table.
 ///
-/// Can be used to select one of the 512 entries of a page table.
+/// Can be used to select one of the 1024 entries of a page table.
 ///
-/// Guaranteed to only ever contain 0..512.
+/// Guaranteed to only ever contain 0..1024.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PageTableIndex(u16);
 
 impl PageTableIndex {
-    /// Creates a new index from the given `u16`. Panics if the given value is >=512.
+    /// Creates a new index from the given `u16`. Panics if the given value is >=1024.
     #[inline]
     pub fn new(index: u16) -> Self {
         assert!(usize::from(index) < ENTRY_COUNT);
         Self(index)
     }
 
-    /// Creates a new index from the given `u16`. Throws away bits if the value is >=512.
+    /// Creates a new index from the given `u16`. Throws away bits if the value is >=1024.
     #[inline]
     pub const fn new_truncate(index: u16) -> Self {
         Self(index % ENTRY_COUNT as u16)
@@ -306,12 +276,6 @@ impl From<PageTableIndex> for u32 {
     }
 }
 
-impl From<PageTableIndex> for u64 {
-    #[inline]
-    fn from(index: PageTableIndex) -> Self {
-        u64::from(index.0)
-    }
-}
 
 impl From<PageTableIndex> for usize {
     #[inline]
@@ -354,13 +318,6 @@ impl From<PageOffset> for u32 {
     #[inline]
     fn from(offset: PageOffset) -> Self {
         u32::from(offset.0)
-    }
-}
-
-impl From<PageOffset> for u64 {
-    #[inline]
-    fn from(offset: PageOffset) -> Self {
-        u64::from(offset.0)
     }
 }
 

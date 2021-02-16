@@ -1,26 +1,21 @@
 //! Abstractions for reading and modifying the mapping of pages.
 
 pub use self::mapped_page_table::{MappedPageTable, PageTableFrameMapping};
-#[cfg(target_pointer_width = "64")]
 pub use self::offset_page_table::OffsetPageTable;
-#[cfg(feature = "instructions")]
-pub use self::recursive_page_table::{InvalidPageTable, RecursivePageTable};
 
 use crate::structures::paging::{
-    frame_alloc::FrameAllocator, page_table::PageTableFlags, Page, PageSize, PhysFrame, Size1GiB,
-    Size2MiB, Size4KiB,
+    frame_alloc::FrameAllocator, page_table::PageTableFlags, Page, PageSize, PhysFrame, Size4MiB,
+     Size4KiB,
 };
 use crate::{PhysAddr, VirtAddr};
 
 mod mapped_page_table;
 mod offset_page_table;
-#[cfg(feature = "instructions")]
-mod recursive_page_table;
 
 /// An empty convencience trait that requires the `Mapper` trait for all page sizes.
-pub trait MapperAllSizes: Mapper<Size4KiB> + Mapper<Size2MiB> + Mapper<Size1GiB> {}
+pub trait MapperAllSizes: Mapper<Size4KiB> + Mapper<Size4MiB> {}
 
-impl<T> MapperAllSizes for T where T: Mapper<Size4KiB> + Mapper<Size2MiB> + Mapper<Size1GiB> {}
+impl<T> MapperAllSizes for T where T: Mapper<Size4KiB> + Mapper<Size4MiB> {}
 
 /// Provides methods for translating virtual addresses.
 pub trait Translate {
@@ -59,7 +54,7 @@ pub enum TranslateResult {
         /// The mapped frame.
         frame: MappedFrame,
         /// The offset whithin the mapped frame.
-        offset: u64,
+        offset: u32,
         /// The entry flags in the lowest-level page table.
         ///
         /// Flags of higher-level page table entries are not included here, but they can still
@@ -78,10 +73,8 @@ pub enum TranslateResult {
 pub enum MappedFrame {
     /// The virtual address is mapped to a 4KiB frame.
     Size4KiB(PhysFrame<Size4KiB>),
-    /// The virtual address is mapped to a "large" 2MiB frame.
-    Size2MiB(PhysFrame<Size2MiB>),
-    /// The virtual address is mapped to a "huge" 1GiB frame.
-    Size1GiB(PhysFrame<Size1GiB>),
+    /// The virtual address is mapped to a "large" 4MiB frame.
+    Size4MiB(PhysFrame<Size4MiB>),
 }
 
 impl MappedFrame {
@@ -90,19 +83,17 @@ impl MappedFrame {
         pub fn start_address(&self) -> PhysAddr {
             match self {
                 MappedFrame::Size4KiB(frame) => frame.start_address(),
-                MappedFrame::Size2MiB(frame) => frame.start_address(),
-                MappedFrame::Size1GiB(frame) => frame.start_address(),
+                MappedFrame::Size4MiB(frame) => frame.start_address(),
             }
         }
     }
 
     const_fn! {
-        /// Returns the size the frame (4KB, 2MB or 1GB).
-        pub fn size(&self) -> u64 {
+        /// Returns the size the frame (4KB, 4MB).
+        pub fn size(&self) -> u32 {
             match self {
                 MappedFrame::Size4KiB(frame) => frame.size(),
-                MappedFrame::Size2MiB(frame) => frame.size(),
-                MappedFrame::Size1GiB(frame) => frame.size(),
+                MappedFrame::Size4MiB(frame) => frame.size(),
             }
         }
     }
@@ -299,36 +290,6 @@ pub trait Mapper<S: PageSize> {
         flags: PageTableFlags,
     ) -> Result<MapperFlush<S>, FlagUpdateError>;
 
-    /// Set the flags of an existing page level 4 table entry
-    ///
-    /// ## Safety
-    ///
-    /// This method is unsafe because changing the flags of a mapping
-    /// might result in undefined behavior. For example, setting the
-    /// `GLOBAL` and `WRITABLE` flags for a page might result in the corruption
-    /// of values stored in that page from processes running in other address
-    /// spaces.
-    unsafe fn set_flags_p4_entry(
-        &mut self,
-        page: Page<S>,
-        flags: PageTableFlags,
-    ) -> Result<MapperFlushAll, FlagUpdateError>;
-
-    /// Set the flags of an existing page table level 3 entry
-    ///
-    /// ## Safety
-    ///
-    /// This method is unsafe because changing the flags of a mapping
-    /// might result in undefined behavior. For example, setting the
-    /// `GLOBAL` and `WRITABLE` flags for a page might result in the corruption
-    /// of values stored in that page from processes running in other address
-    /// spaces.
-    unsafe fn set_flags_p3_entry(
-        &mut self,
-        page: Page<S>,
-        flags: PageTableFlags,
-    ) -> Result<MapperFlushAll, FlagUpdateError>;
-
     /// Set the flags of an existing page table level 2 entry
     ///
     /// ## Safety
@@ -369,7 +330,7 @@ pub trait Mapper<S: PageSize> {
         S: PageSize,
         Self: Mapper<S>,
     {
-        let page = Page::containing_address(VirtAddr::new(frame.start_address().as_u64()));
+        let page = Page::containing_address(VirtAddr::new(frame.start_address().as_u32()));
         self.map_to(page, frame, flags, frame_allocator)
     }
 }

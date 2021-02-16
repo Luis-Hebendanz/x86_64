@@ -7,7 +7,7 @@ use crate::VirtAddr;
 pub fn flush(addr: VirtAddr) {
     #[cfg(feature = "inline_asm")]
     unsafe {
-        asm!("invlpg [{}]", in(reg) addr.as_u64(), options(nostack))
+        asm!("invlpg [{}]", in(reg) addr.as_u32(), options(nostack))
     };
 
     #[cfg(not(feature = "inline_asm"))]
@@ -45,8 +45,8 @@ pub enum InvPicdCommand {
 #[repr(C)]
 #[derive(Debug)]
 struct InvpcidDescriptor {
-    address: u64,
-    pcid: u64,
+    address: u32,
+    pcid: u32,
 }
 
 /// Structure of a PCID. A PCID has to be <= 4096 for x86_64.
@@ -82,12 +82,12 @@ pub unsafe fn flush_pcid(command: InvPicdCommand) {
         pcid: 0,
     };
 
-    let kind: u64;
+    let kind: u32;
     match command {
         InvPicdCommand::Address(addr, pcid) => {
             kind = 0;
             desc.pcid = pcid.value().into();
-            desc.address = addr.as_u64()
+            desc.address = addr.as_u32()
         }
         InvPicdCommand::Single(pcid) => {
             kind = 1;
@@ -99,7 +99,7 @@ pub unsafe fn flush_pcid(command: InvPicdCommand) {
 
     #[cfg(feature = "inline_asm")]
     {
-        let desc_value = &desc as *const InvpcidDescriptor as u64;
+        let desc_value = &desc as *const InvpcidDescriptor as u32;
         asm!("invpcid {1}, [{0}]", in(reg) desc_value, in(reg) kind);
     };
 

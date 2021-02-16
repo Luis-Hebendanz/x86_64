@@ -18,25 +18,9 @@ impl Msr {
 #[derive(Debug)]
 pub struct Efer;
 
-/// FS.Base Model Specific Register.
-#[derive(Debug)]
-pub struct FsBase;
-
-/// GS.Base Model Specific Register.
-#[derive(Debug)]
-pub struct GsBase;
-
-/// KernelGsBase Model Specific Register.
-#[derive(Debug)]
-pub struct KernelGsBase;
-
 /// Syscall Register: STAR
 #[derive(Debug)]
 pub struct Star;
-
-/// Syscall Register: LSTAR
-#[derive(Debug)]
-pub struct LStar;
 
 /// Syscall Register: SFMASK
 #[derive(Debug)]
@@ -47,39 +31,14 @@ impl Efer {
     pub const MSR: Msr = Msr(0xC000_0080);
 }
 
-impl FsBase {
-    /// The underlying model specific register.
-    pub const MSR: Msr = Msr(0xC000_0100);
-}
-
-impl GsBase {
-    /// The underlying model specific register.
-    pub const MSR: Msr = Msr(0xC000_0101);
-}
-
-impl KernelGsBase {
-    /// The underlying model specific register.
-    pub const MSR: Msr = Msr(0xC000_0102);
-}
-
 impl Star {
     /// The underlying model specific register.
     pub const MSR: Msr = Msr(0xC000_0081);
 }
 
-impl LStar {
-    /// The underlying model specific register.
-    pub const MSR: Msr = Msr(0xC000_0082);
-}
-
-impl SFMask {
-    /// The underlying model specific register.
-    pub const MSR: Msr = Msr(0xC000_0084);
-}
-
 bitflags! {
     /// Flags of the Extended Feature Enable Register.
-    pub struct EferFlags: u64 {
+    pub struct EferFlags: u32 {
         /// Enables the `syscall` and `sysret` instructions.
         const SYSTEM_CALL_EXTENSIONS = 1;
         /// Activates long mode, requires activating paging.
@@ -102,8 +61,6 @@ bitflags! {
 #[cfg(feature = "instructions")]
 mod x86_64 {
     use super::*;
-    use crate::addr::VirtAddr;
-    use crate::registers::rflags::RFlags;
     use crate::structures::gdt::SegmentSelector;
     use crate::PrivilegeLevel;
     use bit_field::BitField;
@@ -158,8 +115,8 @@ mod x86_64 {
 
         /// Read the current raw EFER flags.
         #[inline]
-        pub fn read_raw() -> u64 {
-            unsafe { Self::MSR.read() }
+        pub fn read_raw() -> u32 {
+            unsafe { Self::MSR.read() as u32 }
         }
 
         /// Write the EFER flags, preserving reserved values.
@@ -188,9 +145,9 @@ mod x86_64 {
         /// Unsafe because it's possible to
         /// break memory safety with wrong flags, e.g. by disabling long mode.
         #[inline]
-        pub unsafe fn write_raw(flags: u64) {
+        pub unsafe fn write_raw(flags: u32) {
             let mut msr = Self::MSR;
-            msr.write(flags);
+            msr.write(flags as u64);
         }
 
         /// Update EFER flags.
@@ -209,51 +166,6 @@ mod x86_64 {
             let mut flags = Self::read();
             f(&mut flags);
             Self::write(flags);
-        }
-    }
-
-    impl FsBase {
-        /// Read the current FsBase register.
-        #[inline]
-        pub fn read() -> VirtAddr {
-            VirtAddr::new(unsafe { Self::MSR.read() })
-        }
-
-        /// Write a given virtual address to the FS.Base register.
-        #[inline]
-        pub fn write(address: VirtAddr) {
-            let mut msr = Self::MSR;
-            unsafe { msr.write(address.as_u64()) };
-        }
-    }
-
-    impl GsBase {
-        /// Read the current GsBase register.
-        #[inline]
-        pub fn read() -> VirtAddr {
-            VirtAddr::new(unsafe { Self::MSR.read() })
-        }
-
-        /// Write a given virtual address to the GS.Base register.
-        #[inline]
-        pub fn write(address: VirtAddr) {
-            let mut msr = Self::MSR;
-            unsafe { msr.write(address.as_u64()) };
-        }
-    }
-
-    impl KernelGsBase {
-        /// Read the current KernelGsBase register.
-        #[inline]
-        pub fn read() -> VirtAddr {
-            VirtAddr::new(unsafe { Self::MSR.read() })
-        }
-
-        /// Write a given virtual address to the KernelGsBase register.
-        #[inline]
-        pub fn write(address: VirtAddr) {
-            let mut msr = Self::MSR;
-            unsafe { msr.write(address.as_u64()) };
         }
     }
 
@@ -356,50 +268,6 @@ mod x86_64 {
             unsafe { Self::write_raw(ss_sysret.0 - 8, cs_syscall.0) };
 
             Ok(())
-        }
-    }
-
-    impl LStar {
-        /// Read the current LStar register.
-        /// This holds the target RIP of a syscall.
-        #[inline]
-        pub fn read() -> VirtAddr {
-            VirtAddr::new(unsafe { Self::MSR.read() })
-        }
-
-        /// Write a given virtual address to the LStar register.
-        /// This holds the target RIP of a syscall.
-        #[inline]
-        pub fn write(address: VirtAddr) {
-            let mut msr = Self::MSR;
-            unsafe { msr.write(address.as_u64()) };
-        }
-    }
-
-    impl SFMask {
-        /// Read to the SFMask register.
-        /// The SFMASK register is used to specify which RFLAGS bits
-        /// are cleared during a SYSCALL. In long mode, SFMASK is used
-        /// to specify which RFLAGS bits are cleared when SYSCALL is
-        /// executed. If a bit in SFMASK is set to 1, the corresponding
-        /// bit in RFLAGS is cleared to 0. If a bit in SFMASK is cleared
-        /// to 0, the corresponding rFLAGS bit is not modified.
-        #[inline]
-        pub fn read() -> RFlags {
-            RFlags::from_bits(unsafe { Self::MSR.read() }).unwrap()
-        }
-
-        /// Write to the SFMask register.
-        /// The SFMASK register is used to specify which RFLAGS bits
-        /// are cleared during a SYSCALL. In long mode, SFMASK is used
-        /// to specify which RFLAGS bits are cleared when SYSCALL is
-        /// executed. If a bit in SFMASK is set to 1, the corresponding
-        /// bit in RFLAGS is cleared to 0. If a bit in SFMASK is cleared
-        /// to 0, the corresponding rFLAGS bit is not modified.
-        #[inline]
-        pub fn write(value: RFlags) {
-            let mut msr = Self::MSR;
-            unsafe { msr.write(value.bits()) };
         }
     }
 }

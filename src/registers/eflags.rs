@@ -6,8 +6,8 @@ pub use self::x86_64::*;
 use bitflags::bitflags;
 
 bitflags! {
-    /// The RFLAGS register.
-    pub struct RFlags: u64 {
+    /// The EFLAGS register.
+    pub struct EFlags: u32 {
         /// Processor feature identification flag.
         ///
         /// If this flag is modifiable, the CPU supports CPUID.
@@ -70,14 +70,14 @@ mod x86_64 {
     ///
     /// Drops any unknown bits.
     #[inline]
-    pub fn read() -> RFlags {
-        RFlags::from_bits_truncate(read_raw())
+    pub fn read() -> EFlags {
+        EFlags::from_bits_truncate(read_raw())
     }
 
     /// Returns the raw current value of the RFLAGS register.
     #[inline]
-    pub fn read_raw() -> u64 {
-        let r: u64;
+    pub fn read_raw() -> u32 {
+        let r: u32;
         #[cfg(feature = "inline_asm")]
         unsafe {
             asm!("pushf; pop {}", out(reg) r)
@@ -99,9 +99,9 @@ mod x86_64 {
     /// the `DF` flag must be unset in all Rust code. Also, modifying `CF`, `PF`, or any other
     /// flags also used by Rust/LLVM can result in undefined behavior too.
     #[inline]
-    pub unsafe fn write(flags: RFlags) {
+    pub unsafe fn write(flags: EFlags) {
         let old_value = read_raw();
-        let reserved = old_value & !(RFlags::all().bits());
+        let reserved = old_value & !(EFlags::all().bits());
         let new_value = reserved | flags.bits();
 
         write_raw(new_value);
@@ -118,7 +118,7 @@ mod x86_64 {
     /// the `DF` flag must be unset in all Rust code. Also, modifying `CF`, `PF`, or any other
     /// flags also used by Rust/LLVM can result in undefined behavior too.
     #[inline]
-    pub unsafe fn write_raw(val: u64) {
+    pub unsafe fn write_raw(val: u32) {
         #[cfg(feature = "inline_asm")]
         {
             // FIXME - There's probably a better way than saying we preserve the flags even though we actually don't

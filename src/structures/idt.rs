@@ -35,7 +35,7 @@ use core::ops::{Deref, Index, IndexMut, RangeBounds};
 #[allow(missing_debug_implementations)]
 #[derive(Clone)]
 #[repr(C)]
-#[repr(align(16))]
+#[repr(align(8))]
 pub struct InterruptDescriptorTable {
     /// A divide error (`#DE`) occurs when the denominator of a DIV instruction or
     /// an IDIV instruction is 0. A `#DE` also occurs if the result is too large to be
@@ -440,7 +440,7 @@ impl InterruptDescriptorTable {
     fn pointer(&self) -> DescriptorTablePointer {
         use core::mem::size_of;
         DescriptorTablePointer {
-            base: VirtAddr::new(self as *const _ as u64),
+            base: VirtAddr::new(self as *const _ as u32),
             limit: (size_of::<Self>() - 1) as u16,
         }
     }

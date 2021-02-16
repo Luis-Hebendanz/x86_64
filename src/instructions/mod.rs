@@ -58,12 +58,12 @@ pub fn bochs_breakpoint() {
 /// instructions to execute.
 #[cfg(feature = "inline_asm")]
 #[inline(always)]
-pub fn read_rip() -> VirtAddr {
-    let rip: u64;
+pub fn read_eip() -> VirtAddr {
+    let eip: u32;
     unsafe {
         asm!(
-            "lea {}, [rip]", out(reg) rip, options(nostack, nomem)
+            "lea {}, [eip]", out(reg) eip, options(nostack, nomem)
         );
     }
-    VirtAddr::new(rip)
+    VirtAddr::new(eip)
 }
